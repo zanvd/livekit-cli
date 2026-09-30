@@ -200,7 +200,15 @@ func ParseTaskfile(rootPath string) (*ast.Taskfile, error) {
 	return tf, nil
 }
 
+func ensureTempDirEnv() {
+	if os.Getenv("TMPDIR") == "" {
+		os.Setenv("TMPDIR", os.TempDir())
+	}
+}
+
 func NewTaskExecutor(dir string, verbose bool) *task.Executor {
+	ensureTempDirEnv()
+
 	var o io.Writer = os.Stdout
 	var e io.Writer = os.Stderr
 	return &task.Executor{

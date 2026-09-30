@@ -616,3 +616,72 @@ func TestInstantiateDotEnv_PriorsAsSubstitutionsSkipPrompt(t *testing.T) {
 		t.Errorf("expected prompted value for OTHER, got %q", got["OTHER"])
 	}
 }
+
+func TestEnsureTempDirEnv(t *testing.T) {
+	t.Run("sets TMPDIR when empty", func(t *testing.T) {
+		t.Setenv("TMPDIR", "")
+		ensureTempDirEnv()
+		if got, want := os.Getenv("TMPDIR"), os.TempDir(); got != want {
+			t.Errorf("expected TMPDIR=%q, got %q", want, got)
+		}
+	})
+
+	t.Run("leaves TMPDIR alone when set", func(t *testing.T) {
+		custom := t.TempDir()
+		t.Setenv("TMPDIR", custom)
+		ensureTempDirEnv()
+		if got := os.Getenv("TMPDIR"); got != custom {
+			t.Errorf("expected TMPDIR=%q to be preserved, got %q", custom, got)
+		}
+	})
+}
+
+func TestNewTask_MktempWithoutTMPDIR(t *testing.T) {
+	t.Setenv("TMPDIR", "")
+
+	dir := t.TempDir()
+	taskfile := `version: "3"
+tasks:
+  rewrite:
+    cmds:
+      - |
+        old='agent_name="my-agent"'
+        new='agent_name="renamed"'
+        file="target.txt"
+        tmp="$(mktemp)"
+        while IFS= read -r line; do
+          printf '%s\n' "${line//$old/$new}" >> "$tmp"
+        done < "$file"
+        # On Windows, u-root's mktemp leaves the file open and an open file
+        # can't be renamed or deleted, so copy it back instead of mv-ing it.
+        cat "$tmp" > "$file"
+        rm -f "$tmp" 2>/dev/null || true
+`
+	if err := os.WriteFile(filepath.Join(dir, TaskFile), []byte(taskfile), 0600); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(dir, "target.txt")
+	if err := os.WriteFile(target, []byte("agent_name=\"my-agent\"\nother=1\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	tf, err := ParseTaskfile(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, err := NewTask(context.Background(), tf, dir, "rewrite", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := run(); err != nil {
+		t.Fatalf("task failed: %v", err)
+	}
+
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "agent_name=\"renamed\"\nother=1\n"; string(got) != want {
+		t.Errorf("expected %q, got %q", want, got)
+	}
+}
