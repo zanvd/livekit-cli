@@ -15,6 +15,7 @@
 package config
 
 import (
+	"io/fs"
 	"testing"
 	"time"
 
@@ -151,4 +152,25 @@ func TestCLIConfigUpsertUser(t *testing.T) {
 	assert.Len(t, c.Users, 3)
 	assert.Equal(t, "prod2", c.Users[0].SessionToken)
 	assert.Equal(t, "staging2", c.Users[2].SessionToken)
+}
+
+func TestPermsTooOpen(t *testing.T) {
+	tests := []struct {
+		name string
+		mode fs.FileMode
+		goos string
+		want bool
+	}{
+		{"linux owner-only", 0600, "linux", false},
+		{"linux group/world readable", 0644, "linux", true},
+		{"linux group writable", 0620, "linux", true},
+		{"darwin world readable", 0604, "darwin", true},
+		{"windows reports 0666", 0666, "windows", false},
+		{"windows reports 0444 when read-only", 0444, "windows", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, permsTooOpen(tt.mode, tt.goos))
+		})
+	}
 }

@@ -17,8 +17,10 @@ package config
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path"
+	"runtime"
 	"strings"
 	"time"
 
@@ -319,6 +321,14 @@ func ProjectNotFoundError(projects []ProjectConfig) error {
 	return fmt.Errorf("project not found. Available projects: %s", strings.Join(names, ", "))
 }
 
+// permsTooOpen reports whether a config file's mode is readable or writable by
+// anyone other than its owner. Always false on Windows: it uses ACLs rather than
+// Unix permission bits, and Go reports every file there as 0666 (or 0444 if
+// read-only), so the check could never be satisfied and users can't act on it.
+func permsTooOpen(mode fs.FileMode, goos string) bool {
+	return goos != "windows" && mode.Perm()&0077 != 0
+}
+
 // LoadOrCreate loads config file from ~/.livekit/cli-config.yaml
 // if it doesn't exist, it'll return an empty config file
 func LoadOrCreate() (*CLIConfig, error) {
@@ -332,7 +342,7 @@ func LoadOrCreate() (*CLIConfig, error) {
 		return c, nil
 	} else if err != nil {
 		return nil, err
-	} else if s.Mode().Perm()&0077 != 0 {
+	} else if permsTooOpen(s.Mode(), runtime.GOOS) {
 		// because this file contains private keys, warn that
 		// only the owner should have permission to access it
 		util.Warnf("WARNING: config file %s should have permissions %o", configPath, 0600)
