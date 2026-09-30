@@ -19,7 +19,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -110,7 +109,7 @@ func MoveDir(src, dest string) error {
 // and a function to clean up the temporary path that should always be deferred
 // in the case of a failure to relocate.
 func UseTempPath(permanentPath string) (string, func() error, func() error) {
-	tempPath := path.Join(os.TempDir(), guid.New("LK_"))
+	tempPath := filepath.Join(os.TempDir(), guid.New("LK_"))
 	relocate := func() error {
 		return MoveDir(tempPath, permanentPath)
 	}

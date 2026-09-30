@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -414,7 +414,7 @@ func (c *CLIConfig) persist(announce bool) error {
 	if err != nil {
 		return err
 	}
-	if err = os.MkdirAll(path.Dir(configPath), 0700); err != nil {
+	if err = os.MkdirAll(filepath.Dir(configPath), 0700); err != nil {
 		return err
 	}
 
@@ -439,5 +439,5 @@ func getConfigLocation() (string, error) {
 		return "", err
 	}
 
-	return path.Join(dir, ".livekit", "cli-config.yaml"), nil
+	return filepath.Join(dir, ".livekit", "cli-config.yaml"), nil
 }

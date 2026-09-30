@@ -16,6 +16,8 @@ package config
 
 import (
 	"io/fs"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -173,4 +175,30 @@ func TestPermsTooOpen(t *testing.T) {
 			assert.Equal(t, tt.want, permsTooOpen(tt.mode, tt.goos))
 		})
 	}
+}
+
+func TestGetConfigLocation(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)        // os.UserHomeDir on unix
+	t.Setenv("USERPROFILE", home) // os.UserHomeDir on windows
+
+	got, err := getConfigLocation()
+	assert.NoError(t, err)
+	assert.Equal(t, filepath.Join(home, ".livekit", "cli-config.yaml"), got)
+}
+
+func TestCLIConfigPersistCreatesConfigDir(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+
+	c := &CLIConfig{Theme: "test"}
+	assert.NoError(t, c.persist(false))
+
+	_, err := os.Stat(filepath.Join(home, ".livekit", "cli-config.yaml"))
+	assert.NoError(t, err)
+
+	loaded, err := LoadOrCreate()
+	assert.NoError(t, err)
+	assert.Equal(t, "test", loaded.Theme)
 }
